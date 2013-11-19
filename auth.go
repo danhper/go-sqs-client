@@ -15,10 +15,6 @@ import (
 
 const algorithm = "AWS4-HMAC-SHA256"
 
-type Auth struct {
-  accessKey, secretKey string
-}
-
 func hash(str string) string {
   hasher := sha256.New()
   hasher.Write([]byte(str))
@@ -31,6 +27,22 @@ func getLongTime(t time.Time) string {
 
 func getShortTime(t time.Time) string {
   return t.Format("20060102")
+}
+
+func setSignedHeaders(c Client, request *HTTPRequest) {
+  credentials := getCredentials(c.Credentials().accessKey, request.createdTime,
+    c.RegionName(), c.ServiceName())
+  headers := request.Header
+  headers.Set("X-Amz-Algorithm", algorithm)
+  headers.Set("X-Amz-Credential", credentials)
+  headers.Set("X-Amz-Date", getLongTime(request.createdTime))
+  headers.Set("X-Amz-SignedHeaders",  generateSignedHeaders(headers))
+}
+
+func getCredentials(accessKey string, t time.Time,
+  regionName string, serviceName string) string {
+  scope := getScope(t, regionName, serviceName)
+  return accessKey + "/" + scope
 }
 
 func getScope(t time.Time, regionName string, serviceName string) string {
@@ -62,7 +74,7 @@ func generateSignedHeaders(headers http.Header) string {
   var signedHeaders []string
   for k, _ := range headers {
     key := strings.ToLower(k)
-    if strings.HasPrefix(key, "x-") || key == "host" || key == "content-type" {
+    if key == "x-amz-date" || key == "host" || key == "content-type" {
       signedHeaders = append(signedHeaders, key)
     }
   }
