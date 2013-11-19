@@ -10,7 +10,10 @@ import (
   "regexp"
   "sort"
   "strings"
+  "time"
 )
+
+const algorithm = "AWS4-HMAC-SHA256"
 
 type Auth struct {
   accessKey, secretKey string
@@ -22,11 +25,29 @@ func hash(str string) string {
   return hex.EncodeToString(hasher.Sum(nil))
 }
 
-func GenerateHashedRequest(request *HTTPRequest) string {
-  return hash(GenerateCanonicalRequest(request))
+func getLongTime(t time.Time) string {
+  return t.Format("20060102T150405Z")
 }
 
-func GenerateCanonicalRequest(request *HTTPRequest) string {
+func getShortTime(t time.Time) string {
+  return t.Format("20060102")
+}
+
+func getScope(t time.Time, regionName string, serviceName string) string {
+  return getShortTime(t) + "/" + regionName + "/" + serviceName + "/aws4_request"
+}
+
+func GenerateStringToSign(regionName string, serviceName string,
+  t time.Time, hashedRequest string) string {
+  scope := getScope(t, regionName, serviceName)
+  return algorithm + "\n" + getLongTime(t) + "\n" + scope + "\n" + hashedRequest
+}
+
+func GenerateHashedRequest(request *HTTPRequest) string {
+  return hash(generateCanonicalRequest(request))
+}
+
+func generateCanonicalRequest(request *HTTPRequest) string {
   canonicalRequest := request.Method + "\n"
   canonicalRequest += request.URL.Path + "\n"
   canonicalRequest += generateCanonicalQuery(request.URL.Query()) + "\n"
@@ -75,9 +96,13 @@ func sign(key []byte, msg string) []byte {
   return h.Sum(nil)
 }
 
-func getSignatureKey(secretKey string, dateStamp string,
+func GenerageSignature(signingKey []byte, stringToSign string) string {
+  return hex.EncodeToString(sign(signingKey, stringToSign))
+}
+
+func GetSignatureKey(secretKey string, t time.Time,
   regionName string, serviceName string) []byte {
-  kDate := sign([]byte("AWS4" + secretKey), dateStamp)
+  kDate := sign([]byte("AWS4" + secretKey), getShortTime(t))
   kRegion := sign(kDate, regionName)
   kService := sign(kRegion, serviceName)
   kSigining := sign(kService, "aws4_request")
