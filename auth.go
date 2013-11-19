@@ -7,6 +7,7 @@ import (
   "fmt"
   "net/http"
   "net/url"
+  "regexp"
   "sort"
   "strings"
 )
@@ -85,8 +86,12 @@ func getSignatureKey(secretKey string, dateStamp string,
 
 // https://gist.github.com/hnaohiro/4627658
 func urlencode(s string) (result string) {
+  authorizedChars := regexp.MustCompile("[A-Za-z0-9_.~-]")
   for _, c := range(s) {
-    if c <= 0x7f { // single byte
+    char := fmt.Sprintf("%c", c)
+    if authorizedChars.FindStringIndex(char) != nil {
+      result += char
+    } else if c <= 0x7f { // single byte
       result += fmt.Sprintf("%%%X", c)
     } else if c > 0x1fffff { // quaternary byte
       result += fmt.Sprintf("%%%X%%%X%%%X%%%X",
