@@ -21,5 +21,5 @@ func NewHTTPRequestWithTime(method string, url string,
 }
 
 func NewHTTPRequest(method string, url string, body string) (*HTTPRequest, error) {
-  return NewHTTPRequestWithTime(method, url, body, time.Now())
+  return NewHTTPRequestWithTime(method, url, body, time.Now().UTC())
 }

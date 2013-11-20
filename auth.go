@@ -29,14 +29,15 @@ func getShortTime(t time.Time) string {
   return t.Format("20060102")
 }
 
-func setSignedHeaders(c Client, request *HTTPRequest) {
+func updateQueryWithAuth(c Client, request *HTTPRequest) {
   credentials := getCredentials(c.Credentials().accessKey, request.createdTime,
     c.RegionName(), c.ServiceName())
-  headers := request.Header
-  headers.Set("X-Amz-Algorithm", algorithm)
-  headers.Set("X-Amz-Credential", credentials)
-  headers.Set("X-Amz-Date", getLongTime(request.createdTime))
-  headers.Set("X-Amz-SignedHeaders",  generateSignedHeaders(headers))
+  query := request.URL.Query()
+  query.Set("X-Amz-Algorithm", algorithm)
+  query.Set("X-Amz-Credential", credentials)
+  query.Set("X-Amz-Date", getLongTime(request.createdTime))
+  query.Set("X-Amz-SignedHeaders",  generateSignedHeaders(request.Header))
+  request.URL.RawQuery = query.Encode()
 }
 
 func getCredentials(accessKey string, t time.Time,
@@ -49,19 +50,27 @@ func getScope(t time.Time, regionName string, serviceName string) string {
   return getShortTime(t) + "/" + regionName + "/" + serviceName + "/aws4_request"
 }
 
-func GenerateStringToSign(regionName string, serviceName string,
+func generateStringToSign(regionName string, serviceName string,
   t time.Time, hashedRequest string) string {
   scope := getScope(t, regionName, serviceName)
   return algorithm + "\n" + getLongTime(t) + "\n" + scope + "\n" + hashedRequest
 }
 
-func GenerateHashedRequest(request *HTTPRequest) string {
+func generateHashedRequest(request *HTTPRequest) string {
   return hash(generateCanonicalRequest(request))
+}
+
+func prependSlash(url string) string {
+  if strings.HasPrefix(url, "/") {
+    return url
+  } else {
+    return "/" + url
+  }
 }
 
 func generateCanonicalRequest(request *HTTPRequest) string {
   canonicalRequest := request.Method + "\n"
-  canonicalRequest += request.URL.Path + "\n"
+  canonicalRequest += prependSlash(request.URL.Path) + "\n"
   canonicalRequest += generateCanonicalQuery(request.URL.Query()) + "\n"
   canonicalRequest += generateCanonicalHeaders(request.Header) + "\n"
   canonicalRequest += generateSignedHeaders(request.Header) + "\n"
@@ -108,11 +117,18 @@ func sign(key []byte, msg string) []byte {
   return h.Sum(nil)
 }
 
-func GenerageSignature(signingKey []byte, stringToSign string) string {
+func getSignature(c Client, r *HTTPRequest) string {
+  hashedRequest := generateHashedRequest(r)
+  stringToSign := generateStringToSign(c.RegionName(), c.ServiceName(), r.createdTime, hashedRequest)
+  signingKey := getSignatureKey(c.Credentials().secretKey, r.createdTime, c.RegionName(), c.ServiceName())
+  return generateSignature(signingKey, stringToSign)
+}
+
+func generateSignature(signingKey []byte, stringToSign string) string {
   return hex.EncodeToString(sign(signingKey, stringToSign))
 }
 
-func GetSignatureKey(secretKey string, t time.Time,
+func getSignatureKey(secretKey string, t time.Time,
   regionName string, serviceName string) []byte {
   kDate := sign([]byte("AWS4" + secretKey), getShortTime(t))
   kRegion := sign(kDate, regionName)

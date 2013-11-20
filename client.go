@@ -1,11 +1,8 @@
 package aws
 
 import (
-  "fmt"
   "strings"
 )
-
-const endpoint = "sqs.%s.amazonaws.com"
 
 const (
   Virginia   = "us-east-1"
@@ -19,9 +16,10 @@ const (
 )
 
 type Client interface {
-  RegionName() string
+  RegionName()  string
   ServiceName() string
   Credentials() *Credentials
+  EndPoint()    string
 }
 
 type BaseClient struct {
@@ -44,24 +42,21 @@ func (b *BaseClient) Credentials() *Credentials {
   return b.credentials
 }
 
-func (b *BaseClient) GetEndPoint() string {
-  return fmt.Sprintf(endpoint, b.RegionName())
-}
-
-func SignRequest(c Client, request *HTTPRequest) *HTTPRequest {
+func SignRequest(c Client, request *HTTPRequest) {
+  request.Header.Set("host", c.EndPoint())
   if strings.ToLower(request.Method) == "get" {
-    return signGetRequest(c, request)
+    signGetRequest(c, request)
   } else {
-    return  signPostRequest(c, request)
+    signPostRequest(c, request)
   }
 }
 
-func signGetRequest(c Client, request *HTTPRequest) *HTTPRequest {
-  setSignedHeaders(c, request)
-  fmt.Println(request.Header.Get("X-Amz-Credential"))
-  return request
+func signGetRequest(c Client, request *HTTPRequest) {
+  updateQueryWithAuth(c, request)
+  query := request.URL.Query()
+  query.Set("X-Amz-Signature", getSignature(c, request))
+  request.URL.RawQuery = query.Encode()
 }
 
-func signPostRequest(c Client, request *HTTPRequest) *HTTPRequest {
-  return request
+func signPostRequest(c Client, request *HTTPRequest) {
 }
