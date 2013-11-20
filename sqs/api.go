@@ -10,12 +10,17 @@ type QueueResponse struct {
 }
 
 type QueueListResponse struct {
-  Queues []*Queue
+  Queues []Queue
   ResponseMetadata
 }
 
 type MessageResponse struct {
   Message
+  ResponseMetadata
+}
+
+type MessageListResponse struct {
+  Messages []Message
   ResponseMetadata
 }
 
@@ -45,6 +50,10 @@ type sendMessageResponse struct {
   ResponseMetadata
 }
 
+type receiveMessageResponse struct {
+  Messages []Message `xml:"ReceiveMessageResult>Message"`
+  ResponseMetadata
+}
 
 func (c *SqsClient) ListQueues() (*QueueListResponse, error) {
   return c.ListQueuesWithPrefix("")
@@ -64,14 +73,14 @@ func (c *SqsClient) ListQueuesWithPrefix(prefix string) (*QueueListResponse, err
 }
 
 func (c *SqsClient) CreateQueue(name string) (*QueueResponse, error) {
-  queue := &Queue{
+  queue := Queue{
     Name: name,
     Attributes: make(map[string]string),
   }
   return c.CreateQueueWithAttributes(queue)
 }
 
-func (c *SqsClient) CreateQueueWithAttributes(queue *Queue) (*QueueResponse, error) {
+func (c *SqsClient) CreateQueueWithAttributes(queue Queue) (*QueueResponse, error) {
   resp := &createQueueResponse{}
   params := map[string]string {
     "QueueName": queue.Name,
@@ -86,21 +95,21 @@ func (c *SqsClient) CreateQueueWithAttributes(queue *Queue) (*QueueResponse, err
   if err != nil {
     return nil, err
   }
-  return &QueueResponse{*makeQueueFromURL(resp.QueueUrl), resp.ResponseMetadata}, nil
+  return &QueueResponse{makeQueueFromURL(resp.QueueUrl), resp.ResponseMetadata}, nil
 }
 
-func (c *SqsClient) SendMessage(queue *Queue, body string) (*MessageResponse, error) {
+func (c *SqsClient) SendMessage(queue Queue, body string) (*MessageResponse, error) {
   return c.SendMessageWithDelay(queue, body, -1)
 }
 
-func (c *SqsClient) SendMessageWithDelay(queue *Queue, body string, delay int) (*MessageResponse, error) {
+func (c *SqsClient) SendMessageWithDelay(queue Queue, body string, delay int) (*MessageResponse, error) {
   resp := &sendMessageResponse{}
   params := make(map[string]string)
   params["MessageBody"] = body
   if delay >= 0 {
     params["Delay"] = fmt.Sprintf("%d", delay)
   }
-  err := c.makePostRequestWithParams("SendMessage", params, queue, resp)
+  err := c.makePostRequestWithParams("SendMessage", params, &queue, resp)
   if err != nil {
     return nil, err
   }
@@ -120,5 +129,28 @@ func (c *SqsClient) GetQueueUrl(name string) (*QueueResponse, error) {
   if err != nil {
     return nil, err
   }
-  return &QueueResponse{*makeQueueFromURL(resp.QueueUrl), resp.ResponseMetadata}, nil
+  return &QueueResponse{makeQueueFromURL(resp.QueueUrl), resp.ResponseMetadata}, nil
+}
+
+func (c *SqsClient) ReceiveMessage(queue Queue) (*MessageListResponse, error) {
+  return c.ReceiveMessageWithParams(queue, make(map[string]string))
+}
+
+func (c *SqsClient) ReceiveMessageWithParams(queue Queue, params map[string]string) (*MessageListResponse, error) {
+  return c.ReceiveMessageWithParamsAndAttrs(queue, params, nil)
+}
+
+func (c *SqsClient) ReceiveMessageWithParamsAndAttrs(queue Queue, params map[string]string, attrs []string) (*MessageListResponse, error) {
+  resp := &receiveMessageResponse{}
+  for i, v := range attrs {
+    params[fmt.Sprintf("AttributeName.%d", i)] = v
+  }
+  err := c.makeGetRequestWithParams("ReceiveMessage", params, &queue, resp)
+  if err != nil {
+    return nil, err
+  }
+  for _, msg := range resp.Messages {
+    msg.Queue = queue
+  }
+  return &MessageListResponse{resp.Messages, resp.ResponseMetadata}, nil
 }
