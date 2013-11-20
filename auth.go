@@ -4,10 +4,8 @@ import (
   "crypto/hmac"
   "crypto/sha256"
   "encoding/hex"
-  "fmt"
   "net/http"
   "net/url"
-  "regexp"
   "sort"
   "strings"
   "time"
@@ -27,6 +25,18 @@ func getLongTime(t time.Time) string {
 
 func getShortTime(t time.Time) string {
   return t.Format("20060102")
+}
+
+func updateHeadersForAuth(c Client, request *HTTPRequest) {
+  request.Header.Set("x-amz-date", getLongTime(request.createdTime))
+  if request.Header.Get("Content-Type") == "" {
+    request.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
+  }
+  credential := "Credential=" + getCredentials(c.Credentials().accessKey, request.createdTime, c.RegionName(), c.ServiceName())
+  signedHeaders := "SignedHeaders=" + generateSignedHeaders(request.Header)
+  signature := "Signature=" + getSignature(c, request)
+  authString := algorithm + " " + credential + ", " + signedHeaders + ", " + signature
+  request.Header.Set("Authorization", authString)
 }
 
 func updateQueryWithAuth(c Client, request *HTTPRequest) {
@@ -94,7 +104,8 @@ func generateSignedHeaders(headers http.Header) string {
 func generateCanonicalQuery(query url.Values) string {
   var queryParams []string
   for key, value := range query {
-    queryParams = append(queryParams, urlencode(key) + "=" + urlencode(value[0]))
+    q := url.Values{key: {value[0]}}
+    queryParams = append(queryParams, q.Encode())
   }
   sort.StringSlice(queryParams).Sort()
   return strings.Join(queryParams, "&")
@@ -135,37 +146,4 @@ func getSignatureKey(secretKey string, t time.Time,
   kService := sign(kRegion, serviceName)
   kSigining := sign(kService, "aws4_request")
   return kSigining
-}
-
-// https://gist.github.com/hnaohiro/4627658
-func urlencode(s string) (result string) {
-  authorizedChars := regexp.MustCompile("[A-Za-z0-9_.~-]")
-  for _, c := range(s) {
-    char := fmt.Sprintf("%c", c)
-    if authorizedChars.FindStringIndex(char) != nil {
-      result += char
-    } else if c <= 0x7f { // single byte
-      result += fmt.Sprintf("%%%X", c)
-    } else if c > 0x1fffff { // quaternary byte
-      result += fmt.Sprintf("%%%X%%%X%%%X%%%X",
-        0xf0 + ((c & 0x1c0000) >> 18),
-        0x80 + ((c & 0x3f000) >> 12),
-        0x80 + ((c & 0xfc0) >> 6),
-        0x80 + (c & 0x3f),
-        )
-    } else if c > 0x7ff { // triple byte
-      result += fmt.Sprintf("%%%X%%%X%%%X",
-        0xe0 + ((c & 0xf000) >> 12),
-        0x80 + ((c & 0xfc0) >> 6),
-        0x80 + (c & 0x3f),
-        )
-    } else { // double byte
-      result += fmt.Sprintf("%%%X%%%X",
-        0xc0 + ((c & 0x7c0) >> 6),
-        0x80 + (c & 0x3f),
-        )
-    }
-  }
-
-  return result
 }

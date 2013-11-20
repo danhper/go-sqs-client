@@ -59,4 +59,5 @@ func signGetRequest(c Client, request *HTTPRequest) {
 }
 
 func signPostRequest(c Client, request *HTTPRequest) {
+  updateHeadersForAuth(c, request)
 }

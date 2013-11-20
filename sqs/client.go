@@ -4,6 +4,7 @@ import (
   "fmt"
   "io/ioutil"
   "net/http"
+  "net/url"
   "fringe81.com/tuvistavie/aws"
 )
 
@@ -37,8 +38,8 @@ func makeRequest(request *aws.HTTPRequest) string {
   return fmt.Sprintf("%s", body)
 }
 
-func generateGetRequest(url string, params map[string]string) *aws.HTTPRequest {
-  request, _ := aws.NewHTTPRequest("GET", url, "")
+func generateGetRequest(uri string, params map[string]string) *aws.HTTPRequest {
+  request, _ := aws.NewHTTPRequest("GET", uri, "")
   query := request.URL.Query()
   for k, v := range params {
     query.Set(k, v)
@@ -47,20 +48,36 @@ func generateGetRequest(url string, params map[string]string) *aws.HTTPRequest {
   return request
 }
 
-func makeGetRequest(c *SqsClient, url string, action string) string {
-  return makeGetRequestWithParams(c, url, action, make(map[string]string))
+func (c *SqsClient) makePostRequest(uri string, action string) string {
+  return c.makePostRequestWithParams(uri, action, make(map[string]string))
 }
 
-func makeGetRequestWithParams(c *SqsClient, url string, action string, params map[string]string) string {
+func (c *SqsClient) makePostRequestWithParams(uri string, action string, params map[string]string) string {
   params["Action"] = action
-  request := generateGetRequest(url, params)
+  paramValues := url.Values{}
+  for k, v := range params {
+    paramValues[k] = []string{v}
+  }
+  request, _ := aws.NewHTTPRequest("POST", uri, paramValues.Encode())
+  aws.SignRequest(c, request)
+  return makeRequest(request)
+}
+
+func (c *SqsClient) makeGetRequest(uri string, action string) string {
+  return c.makeGetRequestWithParams(uri, action, make(map[string]string))
+}
+
+func (c *SqsClient) makeGetRequestWithParams(uri string, action string, params map[string]string) string {
+  params["Action"] = action
+  request := generateGetRequest(uri, params)
   aws.SignRequest(c, request)
   response := makeRequest(request)
   return response
 }
 
 func (c *SqsClient) ListQueues() string {
-  return makeGetRequest(c, "http://" + c.EndPoint(), "ListQueues")
+  // return c.makeGetRequest("http://" + c.EndPoint(), "ListQueues")
+  return c.makePostRequest("http://" + c.EndPoint(), "ListQueues")
 }
 
 func (sqs *SqsClient) ListQueuesWithPrefix(prefix string) {
