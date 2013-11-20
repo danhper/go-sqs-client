@@ -1,5 +1,9 @@
 package sqs
 
+import (
+  "fmt"
+)
+
 type QueueResponse struct {
   Queue
   ResponseMetadata
@@ -44,9 +48,23 @@ func (c *SqsClient) ListQueuesWithPrefix(prefix string) (*QueueListResponse, err
 }
 
 func (c *SqsClient) CreateQueue(name string) (*QueueResponse, error) {
+  queue := &Queue{
+    Name: name,
+    Attributes: make(map[string]string),
+  }
+  return c.CreateQueueWithAttributes(queue)
+}
+
+func (c *SqsClient) CreateQueueWithAttributes(queue *Queue) (*QueueResponse, error) {
   resp := &createQueueResponse{}
   params := map[string]string {
-    "QueueName": name,
+    "QueueName": queue.Name,
+  }
+  i := 1
+  for key, value := range queue.Attributes {
+    params[fmt.Sprintf("Attributes.%d.Name", i)]  = key
+    params[fmt.Sprintf("Attributes.%d.Value", i)] = value
+    i++
   }
   err := c.makePostRequestWithParams("CreateQueue", params, nil, resp)
   if err == nil {

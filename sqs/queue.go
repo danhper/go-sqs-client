@@ -10,6 +10,13 @@ type Queue struct {
   Attributes map[string]string
 }
 
+func NewQueueWithAttrs(name string, attributes map[string]string) *Queue {
+  return &Queue {
+    Name: name,
+    Attributes: attributes,
+  }
+}
+
 func makeQueueFromURL(url string) *Queue {
   splittedUrl := strings.Split(url, "/")
   return &Queue {
