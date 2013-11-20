@@ -130,7 +130,7 @@ func (c * SqsClient) getURL(queue *Queue) string {
   if queue == nil {
     return aws.GenerateURL(c)
   } else {
-    return queue.url
+    return queue.URL
   }
 }
 
@@ -146,16 +146,20 @@ func (c *SqsClient) makeGetRequestWithParams(action string, params map[string]st
   return makeRequest(request, resp)
 }
 
-func (c *SqsClient) ListQueues() (*ListQueuesResponse, error) {
+func (c *SqsClient) ListQueues() (*QueueListResponse, error) {
   return c.ListQueuesWithPrefix("")
 }
 
-func (c *SqsClient) ListQueuesWithPrefix(prefix string) (*ListQueuesResponse, error) {
+func (c *SqsClient) ListQueuesWithPrefix(prefix string) (*QueueListResponse, error) {
   resp := &ListQueuesResponse{}
   params := make(map[string]string)
   if prefix != "" {
     params["QueueNamePrefix"] = prefix
   }
   err := c.makeGetRequestWithParams("ListQueues", params, nil, resp)
-  return resp, err
+  if err == nil {
+    return &QueueListResponse{makeQueuefromURLs(resp.QueueUrl), resp.ResponseMetadata}, nil
+  } else {
+    return nil, err
+  }
 }

@@ -5,17 +5,22 @@ import (
 )
 
 type Queue struct {
-  name       string
-  url        string
-  attributes map[string]string
+  Name       string
+  URL        string
+  Attributes map[string]string
+}
+
+type QueueListResponse struct {
+  Queues []*Queue
+  ResponseMetadata
 }
 
 func makeQueueFromURL(url string) *Queue {
   splittedUrl := strings.Split(url, "/")
   return &Queue {
-    name       : splittedUrl[len(splittedUrl) - 1],
-    url        : url,
-    attributes : make(map[string]string),
+    Name       : splittedUrl[len(splittedUrl) - 1],
+    URL        : url,
+    Attributes : make(map[string]string),
   }
 }
 
