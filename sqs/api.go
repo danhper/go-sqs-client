@@ -102,18 +102,18 @@ func (c *SqsClient) CreateQueueWithAttributes(queue Queue) (*QueueResponse, erro
   return &QueueResponse{makeQueueFromURL(resp.QueueUrl), resp.ResponseMetadata}, nil
 }
 
-func (c *SqsClient) SendMessage(queue Queue, body string) (*MessageResponse, error) {
+func (c *SqsClient) SendMessage(queue *Queue, body string) (*MessageResponse, error) {
   return c.SendMessageWithDelay(queue, body, -1)
 }
 
-func (c *SqsClient) SendMessageWithDelay(queue Queue, body string, delay int) (*MessageResponse, error) {
+func (c *SqsClient) SendMessageWithDelay(queue *Queue, body string, delay int) (*MessageResponse, error) {
   resp := &sendMessageResponse{}
   params := make(map[string]string)
   params["MessageBody"] = body
   if delay >= 0 {
     params["Delay"] = fmt.Sprintf("%d", delay)
   }
-  err := c.makePostRequestWithParams("SendMessage", params, &queue, resp)
+  err := c.makePostRequestWithParams("SendMessage", params, queue, resp)
   if err != nil {
     return nil, err
   }
