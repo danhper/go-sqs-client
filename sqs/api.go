@@ -34,6 +34,11 @@ type createQueueResponse struct {
   ResponseMetadata
 }
 
+type getQueueUrlResponse struct {
+  QueueUrl string `xml:"GetQueueUrlResult>QueueUrl"`
+  ResponseMetadata
+}
+
 type sendMessageResponse struct {
   MD5 string `xml:"SendMessageResult>MD5OfMessageBody"`
   Id string `xml:"SendMessageResult>MessageId"`
@@ -104,4 +109,16 @@ func (c *SqsClient) SendMessageWithDelay(queue *Queue, body string, delay int) (
     message.Delay = delay
   }
   return &MessageResponse{message, resp.ResponseMetadata}, nil
+}
+
+func (c *SqsClient) GetQueueUrl(name string) (*QueueResponse, error) {
+  resp := &getQueueUrlResponse{}
+  params := map[string]string {
+    "QueueName": name,
+  }
+  err := c.makeGetRequestWithParams("GetQueueUrl", params, nil, resp)
+  if err != nil {
+    return nil, err
+  }
+  return &QueueResponse{*makeQueueFromURL(resp.QueueUrl), resp.ResponseMetadata}, nil
 }
