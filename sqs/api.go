@@ -91,6 +91,7 @@ func (c *SqsClient) SendMessage(queue *Queue, body string) (*MessageResponse, er
 func (c *SqsClient) SendMessageWithDelay(queue *Queue, body string, delay int) (*MessageResponse, error) {
   resp := &sendMessageResponse{}
   params := make(map[string]string)
+  params["MessageBody"] = body
   if delay >= 0 {
     params["Delay"] = fmt.Sprintf("%d", delay)
   }

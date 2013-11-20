@@ -12,15 +12,10 @@ import (
 
 const endpoint = "sqs.%s.amazonaws.com"
 
-type xmlErrors struct {
-  RequestId string
-  Errors []Error `xml:"Errors>Error"`
-}
-
 type Error struct {
   StatusCode int
-  Code string
-  Message string
+  Code string      `xml:"Error>Code"`
+  Message string   `xml:"Error>Message"`
   RequestId string
 }
 
@@ -86,18 +81,13 @@ func makeRequest(request *aws.HTTPRequest, resp interface{}) error {
 }
 
 func getError(r *http.Response, body []byte) error {
-  errors := xmlErrors{}
-  xml.Unmarshal(body, errors)
-  var err Error
-  if len(errors.Errors) > 0 {
-    err = errors.Errors[0]
+  err := &Error{}
+  e := xml.Unmarshal(body, err)
+  if e != nil {
+    return e
   }
-  err.RequestId = errors.RequestId
   err.StatusCode = r.StatusCode
-  if err.Message == "" {
-    err.Message = r.Status
-  }
-  return &err
+  return err
 }
 
 func generateGetRequest(uri string, params map[string]string) *aws.HTTPRequest {
