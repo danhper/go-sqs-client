@@ -7,7 +7,7 @@ type Message struct {
   ReceiptHandle string `xml:"ReceiptHandle"`
   Attribute []Attribute `xml:"Attribute"`
   Delay int
-  Queue Queue
+  Queue *Queue
 }
 
 type Attribute struct {

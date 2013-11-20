@@ -5,12 +5,12 @@ import (
 )
 
 type QueueResponse struct {
-  Queue
+  *Queue
   ResponseMetadata
 }
 
 type QueueListResponse struct {
-  Queues []Queue
+  Queues []*Queue
   ResponseMetadata
 }
 
@@ -27,6 +27,10 @@ type MessageListResponse struct {
 type ResponseMetadata struct {
   RequestId string
   BoxUsage float64
+}
+
+type EmptyResponse struct {
+  ResponseMetadata
 }
 
 type listQueuesResponse struct {
@@ -132,25 +136,40 @@ func (c *SqsClient) GetQueueUrl(name string) (*QueueResponse, error) {
   return &QueueResponse{makeQueueFromURL(resp.QueueUrl), resp.ResponseMetadata}, nil
 }
 
-func (c *SqsClient) ReceiveMessage(queue Queue) (*MessageListResponse, error) {
+func (c *SqsClient) ReceiveMessage(queue *Queue) (*MessageListResponse, error) {
   return c.ReceiveMessageWithParams(queue, make(map[string]string))
 }
 
-func (c *SqsClient) ReceiveMessageWithParams(queue Queue, params map[string]string) (*MessageListResponse, error) {
+func (c *SqsClient) ReceiveMessageWithParams(queue *Queue, params map[string]string) (*MessageListResponse, error) {
   return c.ReceiveMessageWithParamsAndAttrs(queue, params, nil)
 }
 
-func (c *SqsClient) ReceiveMessageWithParamsAndAttrs(queue Queue, params map[string]string, attrs []string) (*MessageListResponse, error) {
+func (c *SqsClient) ReceiveMessageWithParamsAndAttrs(queue *Queue, params map[string]string, attrs []string) (*MessageListResponse, error) {
   resp := &receiveMessageResponse{}
   for i, v := range attrs {
     params[fmt.Sprintf("AttributeName.%d", i)] = v
   }
-  err := c.makeGetRequestWithParams("ReceiveMessage", params, &queue, resp)
+  err := c.makeGetRequestWithParams("ReceiveMessage", params, queue, resp)
   if err != nil {
     return nil, err
   }
-  for _, msg := range resp.Messages {
-    msg.Queue = queue
+  for k, _ := range resp.Messages {
+    resp.Messages[k].Queue = queue
   }
   return &MessageListResponse{resp.Messages, resp.ResponseMetadata}, nil
+}
+
+func (c *SqsClient) DeleteMessage(msg Message) (*EmptyResponse, error) {
+  resp := &EmptyResponse{}
+  params := map[string]string {
+    "ReceiptHandle": msg.ReceiptHandle,
+  }
+  err := c.makePostRequestWithParams("DeleteMessage", params, msg.Queue, resp)
+  return resp, err
+}
+
+func (c *SqsClient) DeleteQueue(queue *Queue) (*EmptyResponse, error) {
+  resp := &EmptyResponse{}
+  err := c.makePostRequest("DeleteQueue", queue, resp)
+  return resp, err
 }
