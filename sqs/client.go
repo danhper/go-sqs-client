@@ -22,9 +22,18 @@ func MakeClient(credentials *aws.Credentials, regionName string) *SqsClient {
   return &SqsClient {aws.MakeBaseClient(regionName, credentials)}
 }
 
-func MakeClientWithBaseCreditentials(accessKey string,
+func MakeClientWithProtocol(credentials *aws.Credentials, regionName string, protocol string) *SqsClient {
+  return &SqsClient {aws.MakeBaseClientWithProtocol(regionName, credentials, protocol)}
+}
+
+func MakeClientAndCreditentials(accessKey string,
   secretKey string, regionName string) *SqsClient {
   return MakeClient(aws.MakeCredentials(accessKey, secretKey), regionName)
+}
+
+func MakeClientAndCreditentialsWithProtocol(accessKey string,
+  secretKey string, regionName string, protocol string) *SqsClient {
+  return MakeClientWithProtocol(aws.MakeCredentials(accessKey, secretKey), regionName, protocol)
 }
 
 func (c *SqsClient) EndPoint() string {
@@ -48,11 +57,12 @@ func generateGetRequest(uri string, params map[string]string) *aws.HTTPRequest {
   return request
 }
 
-func (c *SqsClient) makePostRequest(uri string, action string) string {
-  return c.makePostRequestWithParams(uri, action, make(map[string]string))
+func (c *SqsClient) makePostRequest(action string) string {
+  return c.makePostRequestWithParams(action, make(map[string]string))
 }
 
-func (c *SqsClient) makePostRequestWithParams(uri string, action string, params map[string]string) string {
+func (c *SqsClient) makePostRequestWithParams(action string, params map[string]string) string {
+  uri := aws.GenerateURL(c)
   params["Action"] = action
   paramValues := url.Values{}
   for k, v := range params {
@@ -63,11 +73,12 @@ func (c *SqsClient) makePostRequestWithParams(uri string, action string, params 
   return makeRequest(request)
 }
 
-func (c *SqsClient) makeGetRequest(uri string, action string) string {
-  return c.makeGetRequestWithParams(uri, action, make(map[string]string))
+func (c *SqsClient) makeGetRequest(action string) string {
+  return c.makeGetRequestWithParams(action, make(map[string]string))
 }
 
-func (c *SqsClient) makeGetRequestWithParams(uri string, action string, params map[string]string) string {
+func (c *SqsClient) makeGetRequestWithParams(action string, params map[string]string) string {
+  uri := aws.GenerateURL(c)
   params["Action"] = action
   request := generateGetRequest(uri, params)
   aws.SignRequest(c, request)
@@ -76,10 +87,11 @@ func (c *SqsClient) makeGetRequestWithParams(uri string, action string, params m
 }
 
 func (c *SqsClient) ListQueues() string {
-  // return c.makeGetRequest("http://" + c.EndPoint(), "ListQueues")
-  return c.makePostRequest("http://" + c.EndPoint(), "ListQueues")
+  return c.makeGetRequest("ListQueues")
 }
 
-func (sqs *SqsClient) ListQueuesWithPrefix(prefix string) {
-
+func (c *SqsClient) ListQueuesWithPrefix(prefix string) string {
+  return c.makeGetRequestWithParams("ListQueues", map[string]string{
+    "QueueNamePrefix": prefix,
+  })
 }

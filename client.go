@@ -20,18 +20,37 @@ type Client interface {
   ServiceName() string
   Credentials() *Credentials
   EndPoint()    string
+  Protocol()    string
 }
 
 type BaseClient struct {
   regionName string
   credentials *Credentials
+  protocol   string
 }
 
 func MakeBaseClient(regionName string, credentials *Credentials) BaseClient {
   return BaseClient {
     regionName  : regionName,
     credentials : credentials,
+    protocol    : "http",
   }
+}
+
+func GenerateURL(c Client) string {
+  return c.Protocol() + "://" + c.EndPoint()
+}
+
+func MakeBaseClientWithProtocol(regionName string, credentials *Credentials, protocol string) BaseClient {
+  return BaseClient {
+    regionName  : regionName,
+    credentials : credentials,
+    protocol    : protocol,
+  }
+}
+
+func (b *BaseClient) Protocol() string {
+  return b.protocol
 }
 
 func (b *BaseClient) RegionName() string {
