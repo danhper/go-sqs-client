@@ -145,21 +145,3 @@ func (c *SqsClient) makeGetRequestWithParams(action string, params map[string]st
   aws.SignRequest(c, request)
   return makeRequest(request, resp)
 }
-
-func (c *SqsClient) ListQueues() (*QueueListResponse, error) {
-  return c.ListQueuesWithPrefix("")
-}
-
-func (c *SqsClient) ListQueuesWithPrefix(prefix string) (*QueueListResponse, error) {
-  resp := &ListQueuesResponse{}
-  params := make(map[string]string)
-  if prefix != "" {
-    params["QueueNamePrefix"] = prefix
-  }
-  err := c.makeGetRequestWithParams("ListQueues", params, nil, resp)
-  if err == nil {
-    return &QueueListResponse{makeQueuefromURLs(resp.QueueUrl), resp.ResponseMetadata}, nil
-  } else {
-    return nil, err
-  }
-}

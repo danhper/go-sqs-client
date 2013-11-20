@@ -10,11 +10,6 @@ type Queue struct {
   Attributes map[string]string
 }
 
-type QueueListResponse struct {
-  Queues []*Queue
-  ResponseMetadata
-}
-
 func makeQueueFromURL(url string) *Queue {
   splittedUrl := strings.Split(url, "/")
   return &Queue {
