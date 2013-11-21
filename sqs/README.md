@@ -128,6 +128,7 @@ func NewQueueWithAttrs(name string, attributes map[string]string) *Queue
 the attributes should be the keys and values described in the [CreateQueue documentation](http://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/Query_QueryCreateQueue.html), with the same case. However, the integer should be converted to strings.
 
 Example attributes:
+
 ```go
 map[string]string {
   "DelaySeconds"      = "10",
