@@ -6,6 +6,7 @@ import (
   "io/ioutil"
   "net/http"
   "net/url"
+  "os"
 
   "fringe81.com/tuvistavie/aws"
 )
@@ -33,6 +34,10 @@ func (e *Error) Error() string {
 
 func MakeClient(credentials *aws.Credentials, regionName string) *SqsClient {
   return &SqsClient {aws.MakeBaseClient(regionName, credentials)}
+}
+
+func MakeClientFromEnv() *SqsClient {
+  return MakeClient(aws.MakeCredentialsFromEnv(), os.Getenv("AWS_REGION"))
 }
 
 func MakeClientWithProtocol(credentials *aws.Credentials, regionName string, protocol string) *SqsClient {
@@ -63,7 +68,7 @@ func makeRequest(request *aws.HTTPRequest, resp interface{}) error {
   r, err = client.Do(request.Request)
 
   if err != nil {
-    return nil
+    return err
   }
 
   body, err = ioutil.ReadAll(r.Body)
