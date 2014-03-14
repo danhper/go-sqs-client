@@ -1,82 +1,142 @@
-package aws
+package sqs
 
 import (
-  "strings"
+  "encoding/xml"
+  "fmt"
+  "io/ioutil"
+  "net/http"
+  "net/url"
+  "os"
+
+  "github.com/tuvistavie/go-aws-common"
 )
 
-const (
-  Virginia   = "us-east-1"
-  California = "us-west-1"
-  Oregon     = "us-west-2"
-  Ireland    = "eu-west-1"
-  Singapore  = "ap-southeast-1"
-  Sydney     = "ap-southeast-2"
-  Tokyo      = "ap-northeast-1"
-  SaoPaulo   = "sa-east-1"
-)
+const endpoint = "sqs.%s.amazonaws.com"
 
-type Client interface {
-  RegionName()  string
-  ServiceName() string
-  Credentials() *Credentials
-  EndPoint()    string
-  Protocol()    string
+type Error struct {
+  StatusCode int
+  Code       string `xml:"Error>Code"`
+  Message    string `xml:"Error>Message"`
+  RequestId  string
 }
 
-type BaseClient struct {
-  regionName string
-  credentials *Credentials
-  protocol   string
+type SqsClient struct {
+  aws.BaseClient
 }
 
-func MakeBaseClient(regionName string, credentials *Credentials) BaseClient {
-  return BaseClient {
-    regionName  : regionName,
-    credentials : credentials,
-    protocol    : "http",
+func (s *SqsClient) ServiceName() string {
+  return "sqs"
+}
+
+func (e *Error) Error() string {
+  return fmt.Sprintf("[%d %s] %s: %s", e.StatusCode, e.Code, e.RequestId, e.Message)
+}
+
+func MakeClient(credentials *aws.Credentials, regionName string) *SqsClient {
+  return &SqsClient{aws.MakeBaseClient(regionName, credentials)}
+}
+
+func MakeClientFromEnv() *SqsClient {
+  return MakeClient(aws.MakeCredentialsFromEnv(), os.Getenv("AWS_REGION"))
+}
+
+func MakeClientWithProtocol(credentials *aws.Credentials, regionName string, protocol string) *SqsClient {
+  return &SqsClient{aws.MakeBaseClientWithProtocol(regionName, credentials, protocol)}
+}
+
+func MakeClientAndCreditentials(accessKey string,
+  secretKey string, regionName string) *SqsClient {
+  return MakeClient(aws.MakeCredentials(accessKey, secretKey), regionName)
+}
+
+func MakeClientAndCreditentialsWithProtocol(accessKey string,
+  secretKey string, regionName string, protocol string) *SqsClient {
+  return MakeClientWithProtocol(aws.MakeCredentials(accessKey, secretKey), regionName, protocol)
+}
+
+func (c *SqsClient) EndPoint() string {
+  return fmt.Sprintf(endpoint, c.RegionName())
+}
+
+func makeRequest(request *aws.HTTPRequest, resp interface{}) error {
+  var r *http.Response
+  var body []byte
+  var err error
+
+  client := &http.Client{}
+
+  r, err = client.Do(request.Request)
+
+  if err != nil {
+    return err
   }
-}
 
-func GenerateURL(c Client) string {
-  return c.Protocol() + "://" + c.EndPoint()
-}
+  body, err = ioutil.ReadAll(r.Body)
 
-func MakeBaseClientWithProtocol(regionName string, credentials *Credentials, protocol string) BaseClient {
-  return BaseClient {
-    regionName  : regionName,
-    credentials : credentials,
-    protocol    : protocol,
+  if err != nil {
+    return err
   }
-}
 
-func (b *BaseClient) Protocol() string {
-  return b.protocol
-}
-
-func (b *BaseClient) RegionName() string {
-  return b.regionName
-}
-
-func (b *BaseClient) Credentials() *Credentials {
-  return b.credentials
-}
-
-func SignRequest(c Client, request *HTTPRequest) {
-  request.Header.Set("host", c.EndPoint())
-  if strings.ToLower(request.Method) == "get" {
-    signGetRequest(c, request)
-  } else {
-    signPostRequest(c, request)
+  if r.StatusCode != 200 {
+    return getError(r, body)
   }
+
+  err = xml.Unmarshal(body, resp)
+  return err
 }
 
-func signGetRequest(c Client, request *HTTPRequest) {
-  updateQueryWithAuth(c, request)
+func getError(r *http.Response, body []byte) error {
+  err := &Error{}
+  e := xml.Unmarshal(body, err)
+  if e != nil {
+    return e
+  }
+  err.StatusCode = r.StatusCode
+  return err
+}
+
+func generateGetRequest(uri string, params map[string]string) *aws.HTTPRequest {
+  request, _ := aws.NewHTTPRequest("GET", uri, "")
   query := request.URL.Query()
-  query.Set("X-Amz-Signature", getSignature(c, request))
+  for k, v := range params {
+    query.Set(k, v)
+  }
   request.URL.RawQuery = query.Encode()
+  return request
 }
 
-func signPostRequest(c Client, request *HTTPRequest) {
-  updateHeadersForAuth(c, request)
+func (c *SqsClient) makePostRequest(action string, queue *Queue, resp interface{}) error {
+  return c.makePostRequestWithParams(action, make(map[string]string), queue, resp)
+}
+
+func (c *SqsClient) makePostRequestWithParams(action string, params map[string]string, queue *Queue, resp interface{}) error {
+  uri := c.getURL(queue)
+  params["Action"] = action
+  paramValues := url.Values{}
+  for k, v := range params {
+    paramValues[k] = []string{v}
+  }
+  request, _ := aws.NewHTTPRequest("POST", uri, paramValues.Encode())
+  aws.SignRequest(c, request)
+  return makeRequest(request, resp)
+}
+
+func (c *SqsClient) getURL(queue *Queue) string {
+  if queue == nil {
+    return aws.GenerateURL(c)
+  } else {
+    return queue.URL
+  }
+}
+
+func (c *SqsClient) makeGetRequest(action string, queue *Queue, resp interface{}) error {
+  return c.makeGetRequestWithParams(action, make(map[string]string), queue, resp)
+}
+
+func (c *SqsClient) makeGetRequestWithParams(action string, params map[string]string, queue *Queue, resp interface{}) error {
+  uri := c.getURL(queue)
+  params["Action"] = action
+  request := generateGetRequest(uri, params)
+  aws.SignRequest(c, request)
+  return makeRequest(request, resp)
 }

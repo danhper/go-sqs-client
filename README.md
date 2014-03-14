@@ -18,19 +18,12 @@ All the above API queries are supported with all their options.
 
 ## Installation
 
-Copy the package to your `$GOPATH` with the path below
-
-```
-mkdir -p $GOPATH/fringe81.com/tuvistavie
-cp -r go-aws-sdk $GOPATH/fringe81.com/tuvistavie/aws
-```
-
 You can then import the packages `aws` and `sqs` using
 
 ```go
 import (
-  "fringe81.com/tuvistavie/aws"
-  "fringe81.com/tuvistavie/aws/sqs"
+  "github.com/tuvistavie/go-aws-common"
+  "github.com/tuvistavie/go-sqs-client"
 )
 ```
 
@@ -44,8 +37,8 @@ package main
 import (
   "fmt"
 
-  "fringe81.com/tuvistavie/aws"
-  "fringe81.com/tuvistavie/aws/sqs"
+  "github.com/tuvistavie/go-aws-common"
+  "github.com/tuvistavie/go-sqs-client"
 )
 
 func main() {
